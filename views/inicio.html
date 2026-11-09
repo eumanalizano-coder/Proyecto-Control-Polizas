@@ -1,0 +1,162 @@
+{# views/inicio.html #}
+{# CAPA DE VISTAS: tablero. Solo muestra los datos que envía el controlador. #}
+{% extends "base.html" %}
+
+{% block titulo %}Tablero · Control de pólizas{% endblock %}
+
+{% block contenido %}
+
+    {# CONTADORES: una tarjeta por estado #}
+    <section class="tarjetas">
+        <article class="tarjeta tarjeta-verde">
+            <p class="tarjeta-numero">{{ conteo['Vigente'] }}</p>
+            <p class="tarjeta-etiqueta">Vigentes</p>
+        </article>
+        <article class="tarjeta tarjeta-ambar">
+            <p class="tarjeta-numero">{{ conteo['Por vencer'] }}</p>
+            <p class="tarjeta-etiqueta">Por vencer</p>
+        </article>
+        <article class="tarjeta tarjeta-rojo">
+            <p class="tarjeta-numero">{{ conteo['Vencida'] }}</p>
+            <p class="tarjeta-etiqueta">Vencidas</p>
+        </article>
+        {% if conteo['Sin fecha'] > 0 %}
+        <article class="tarjeta tarjeta-gris">
+            <p class="tarjeta-numero">{{ conteo['Sin fecha'] }}</p>
+            <p class="tarjeta-etiqueta">Sin fecha</p>
+        </article>
+        {% endif %}
+    </section>
+
+    {# BOTÓN: descarga de todos los avisos en un .zip #}
+    <div class="acciones">
+        <a class="boton" href="{{ url_for('polizas.descargar_avisos') }}">
+            Descargar todos los avisos (.zip)
+        </a>
+    </div>
+
+    {# DOS PANELES: primas por aseguradora e inconsistencias #}
+    <section class="columnas">
+
+        <article class="panel">
+            <h2>Primas por aseguradora</h2>
+            <p class="nota">Suma de las pólizas no vencidas.</p>
+            {% if primas %}
+            <table class="tabla-simple">
+                <thead>
+                    <tr>
+                        <th>Aseguradora</th>
+                        <th class="derecha">Prima total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {# BUCLE: una fila por aseguradora, ya vienen ordenadas #}
+                    {% for aseguradora, total in primas.items() %}
+                    <tr>
+                        <td>{{ aseguradora }}</td>
+                        <td class="derecha">CRC {{ '{:,.2f}'.format(total) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="vacio">No hay primas para mostrar.</p>
+            {% endif %}
+        </article>
+
+        <article class="panel">
+            <h2>Inconsistencias</h2>
+            <p class="nota">Problemas encontrados al cruzar los datos.</p>
+            {% if inconsistencias %}
+            <ul class="lista-avisos">
+                {# BUCLE: un texto por cada inconsistencia #}
+                {% for texto in inconsistencias %}
+                <li>{{ texto }}</li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="vacio">Sin inconsistencias.</p>
+            {% endif %}
+        </article>
+
+    </section>
+
+    {# TABLA PRINCIPAL: todas las pólizas, lo urgente primero #}
+    <section class="panel">
+        <h2>Pólizas</h2>
+        <p class="nota">Ordenadas por días para vencer: lo urgente primero.</p>
+
+        <div class="tabla-scroll">
+            <table class="tabla">
+                <thead>
+                    <tr>
+                        <th>Póliza</th>
+                        <th>Asegurado</th>
+                        <th>Cédula</th>
+                        <th>Aseguradora</th>
+                        <th>Ramo</th>
+                        <th>Vence</th>
+                        <th class="derecha">Días</th>
+                        <th class="derecha">Prima anual</th>
+                        <th>Estado</th>
+                        <th>Aviso</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {# BUCLE: una fila por póliza #}
+                    {% for p in resultados %}
+                    {# CONDICIONAL: color de fondo según el estado #}
+                    <tr class="{% if p.estado == 'Vencida' %}fila-vencida{% elif p.estado == 'Por vencer' %}fila-porvencer{% endif %}">
+                        <td class="negrita">{{ p.numero }}</td>
+                        <td>
+                            {{ p.nombre }}
+                            {% if not p.en_maestro %}
+                            <span class="etiqueta etiqueta-gris">no está en el maestro</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ p.cedula }}</td>
+                        <td>{{ p.aseguradora }}</td>
+                        <td>{{ p.ramo }}</td>
+                        <td class="ahora">
+                            {% if p.hasta %}{{ p.hasta.strftime('%d/%m/%Y') }}{% else %}—{% endif %}
+                        </td>
+                        <td class="derecha">
+                            {% if p.dias is not none %}{{ p.dias }}{% else %}—{% endif %}
+                        </td>
+                        <td class="derecha ahora">
+                            {% if p.prima is not none %}
+                                CRC {{ '{:,.2f}'.format(p.prima) }}
+                            {% else %}
+                                <span class="etiqueta etiqueta-gris">sin prima</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {# CONDICIONAL: el color del badge cambia según el estado #}
+                            {% if p.estado == 'Vencida' %}
+                                <span class="badge badge-rojo">Vencida</span>
+                            {% elif p.estado == 'Por vencer' %}
+                                <span class="badge badge-ambar">Por vencer</span>
+                            {% elif p.estado == 'Vigente' %}
+                                <span class="badge badge-verde">Vigente</span>
+                            {% else %}
+                                <span class="badge badge-gris">Sin fecha</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {# CONDICIONAL: solo hay aviso si está por vencer o vencida #}
+                            {% if p.estado in ('Por vencer', 'Vencida') %}
+                                <a class="enlace"
+                                   href="{{ url_for('polizas.aviso', numero=p.numero) }}"
+                                   target="_blank" rel="noopener">Ver aviso</a>
+                            {% else %}
+                                <span class="vacio">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+{% endblock %}

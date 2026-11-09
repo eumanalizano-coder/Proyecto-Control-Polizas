@@ -1,0 +1,37 @@
+{# views/base.html #}
+{# CAPA DE VISTAS: plantilla base. Solo estructura y datos ya calculados. #}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block titulo %}Control de pólizas{% endblock %}</title>
+    {# Hoja de estilos servida desde public/static #}
+    <link rel="stylesheet" href="{{ url_for('static', filename='estilos.css') }}">
+</head>
+<body>
+
+    {# CABECERA: roja, con la marca y la fecha de corte. #}
+    <header class="cabecera">
+        <div class="contenedor cabecera-contenido">
+            <p class="marca">Corredora de Seguros Horizonte</p>
+            <p class="contexto">
+                Control de pólizas · Fecha de corte {{ fecha_corte.strftime('%d/%m/%Y') }}
+            </p>
+        </div>
+    </header>
+
+    {# CONTENIDO: cada vista llena este bloque. #}
+    <main class="contenedor">
+        {% block contenido %}{% endblock %}
+    </main>
+
+    {# PIE DE PÁGINA #}
+    <footer class="pie">
+        <div class="contenedor">
+            <p>Universidad Fundepos · Técnico en IA Empresarial · Módulo 2 · Datos ficticios</p>
+        </div>
+    </footer>
+
+</body>
+</html>

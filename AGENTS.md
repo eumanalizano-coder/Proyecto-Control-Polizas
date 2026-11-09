@@ -1,42 +1,40 @@
-# AGENTS.md
-
-## Propósito del repositorio
-
-Esta es una **carpeta de datos de entrada** para un proyecto de control de pólizas, no una aplicación. Actualmente no hay código, manifiesto de paquetes, compilación, pruebas, lint ni configuración de CI, y la carpeta no es un repositorio git. No busques un punto de entrada de aplicación; el trabajo consiste en ingerir, validar y reportar los datos descritos abajo.
-
-Todos los datos son ficticios (ejercicio académico, Universidad Fundepos). No los trates como datos personales reales ni intentes verificar identidades externamente.
-
-## Estructura
-
-- `Insumos_Control_Polizas/Maestro_Clientes.xlsx` — maestro de clientes, hoja única `Clientes`.
-- `Insumos_Control_Polizas/polizas/Poliza_<numero-poliza>.pdf` — 20 pólizas PDF de una página.
-- Trata `Insumos_Control_Polizas/` como datos fuente de solo lectura; escribe la salida derivada en otra ubicación.
-
-## Esquemas
-
-Maestro de clientes (`Clientes`): fila de encabezado + 20 clientes.
-
-`Cedula | Nombre_Completo | Correo | Telefono | Asesor`
-
-PDFs de pólizas (misma plantilla para las 20):
-
-`Numero de poliza | Ramo | Tomador / Asegurado | Cedula | Vigencia desde | Vigencia hasta | Prima anual | Forma de pago | Suma asegurada | Intermediario | Asesor | Coberturas principales`
-
-- Formato del número de póliza: `<PREFIJO>-<AAAA>-<NNNN>`; el nombre del archivo es `Poliza_<numero-poliza>.pdf`.
-- Prefijo a aseguradora: `AIS` = Aseguradora del Istmo S.A. (5), `PCS` = Proteccion Caribe S.A. (9), `SPC` = Seguros Pacifico Central S.A. (6).
-- Valores de `Ramo`: `Automovil`, `Salud`, `Vida`, `Responsabilidad Civil`, `Hogar`. `Forma de pago`: `Anual`, `Semestral`, `Mensual`.
-- La moneda es CRC (`CRC 1,234,567.00`), las fechas son `DD/MM/AAAA` y el texto es ASCII sin acentos (`Cedula`, `Umana`, `dano`). Conserva estos formatos en la salida.
-
-## Trampas de datos verificadas
-
-- `Poliza_AIS-2026-0002.pdf` tiene la **`Prima anual` vacía** (el PDF no renderiza ningún valor entre `Prima anual:` y `Forma de pago:`). Márcala como faltante; no la conviertas silenciosamente a 0.
-- `PCS-2026-0009` (`Roberto Fantasma Perez`, cédula `9-0000-0001`) **no está en `Maestro_Clientes.xlsx`**.
-- El cliente del maestro `Javier Espinoza Leon` (`1-0321-0654`) **no tiene póliza**.
-- Cruce esperado póliza→cliente: 20 pólizas = 19 coincidencias + 1 póliza sin cliente; 20 clientes = 19 coincidencias + 1 cliente sin póliza.
-- `Vigencia hasta` abarca 2026–2027 e incluye pólizas ya vencidas (p. ej. `AIS-2026-0005`, `PCS-2026-0001`, `PCS-2026-0009` a 2026-11). Calcula el estado a partir de las fechas; no asumas que todas están activas.
-
-## Lectura de los insumos
-
-- Los PDFs son de texto (no escaneados), pero son archivos ReportLab cuyos flujos de contenido usan `ASCII85Decode` + `FlateDecode`. `Select-String`/grep sobre bytes crudos no encontrará el texto de los campos; usa un extractor de texto PDF.
-- Para decodificar manualmente: decodifica ASCII85, omite el encabezado zlib de 2 bytes, infla y luego lee los operadores `(...) Tj`.
-- Entorno actual: no hay Python ni Node; sí hay PowerShell 5.1/.NET y Excel COM. Excel COM lee el xlsx de forma fiable; Word COM falló al abrir estos PDFs.
+# Proyecto: control-polizas
+ 
+## Reglas para el agente
+1. Responde siempre en español, con lenguaje sencillo: soy principiante.
+2. Antes de construir algo nuevo, muestra un plan corto y espera mi aprobación.
+3. Después de cada cambio, explica qué archivos cambiaste y en qué capa están.
+4. Código comentado en español, señalando los ladrillos: variables, tipos, listas, diccionarios, condicionales, bucles y funciones.
+5. No borres archivos ni modifiques nada dentro de data/.
+6. Nunca enciendas la app por tu cuenta: yo la enciendo con iniciar_app.bat.
+ 
+## Tecnología
+- Gestor: uv (nunca pip). Librerías con "uv add". Ejecutar con "uv run app.py".
+- Python 3.12, Flask, pandas, openpyxl, pdfplumber (leer PDF) y fpdf2 (crear PDF). La app NO usa inteligencia artificial.
+ 
+## Arquitectura por capas (respetarla siempre)
+- data/ = la bodega: Maestro_Clientes.xlsx y la carpeta polizas/ con los PDF (solo lectura).
+- models/datos.py = único lugar que abre archivos. cargar_clientes() lee el Excel con pandas (Cedula como texto sin espacios). leer_poliza(ruta) extrae el texto del PDF con pdfplumber y devuelve un diccionario; cargar_polizas() recorre data/polizas y devuelve una lista de diccionarios.
+- models/polizas.py = reglas del negocio: FECHA_CORTE, DIAS_AVISO, estado_poliza(), calcular_resultados(), contar_por_estado(), primas_por_aseguradora(), buscar_inconsistencias(), buscar_por_numero().
+- services/generador_aviso.py = crear el aviso de renovación en PDF con fpdf2 (A4 vertical) y devolverlo en bytes.
+- controllers/polizas_controller.py = rutas de Flask (Blueprint). No calcula: llama al modelo y al servicio.
+- views/ = plantillas HTML (Jinja). Solo muestran. public/static/estilos.css = diseño rojo (#AE1800), negro (#201E1D) y gris claro (#F3F2F2).
+- app.py = crea la app Flask en la variable app con template_folder="views", static_folder="public/static", static_url_path="/static", y registra el Blueprint.
+ 
+## Formato de los PDF
+- La primera línea del texto es el nombre de la aseguradora.
+- Luego hay líneas "Etiqueta: valor" con estas etiquetas: Numero de poliza, Ramo, Tomador / Asegurado, Cedula, Vigencia desde, Vigencia hasta, Prima anual, Forma de pago, Suma asegurada, Asesor.
+- Fechas en formato dd/mm/aaaa. Montos como "CRC 228,000.00" (convertir a número; si está vacío, None).
+ 
+## Reglas del negocio
+- FECHA_CORTE = 2 de noviembre de 2026. DIAS_AVISO = 30.
+- Vencida: hasta < FECHA_CORTE. Por vencer: 0 <= días hasta vencer <= DIAS_AVISO. Vigente: más de DIAS_AVISO días.
+- Cruzar cada póliza con el maestro por Cedula para obtener el correo.
+- Inconsistencias: (1) cliente del maestro sin ninguna póliza; (2) póliza cuya cédula no está en el maestro; (3) póliza sin prima o con fecha ilegible.
+- Primas por aseguradora: suma de la prima de las pólizas no vencidas.
+- Resultado esperado con los datos de data/: 12 Vigentes, 5 Por vencer, 3 Vencidas y 3 inconsistencias.
+ 
+## Rutas de la app
+- "/" tablero: 3 contadores, primas por aseguradora, inconsistencias y tabla de pólizas ordenada por días para vencer (lo urgente primero).
+- "/aviso/" devuelve el aviso en PDF; 404 si la póliza no existe o está vigente.
+- "/descargar-avisos" un .zip con los avisos de todas las pólizas por vencer y vencidas.

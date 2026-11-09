@@ -1,0 +1,15 @@
+# .gitignore
+# Archivos que NO se suben al repositorio.
+
+# Entorno virtual de uv (se recrea solo con "uv sync").
+.venv/
+
+# Archivos temporales de Python.
+__pycache__/
+*.py[cod]
+
+# PDF de prueba generado en local.
+prueba_laura.pdf
+
+# Variables de entorno y secretos.
+.env
