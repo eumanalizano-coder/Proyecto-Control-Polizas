@@ -1,6 +1,8 @@
 # app.py
 # PUNTO DE ENTRADA: aquí se crea la aplicación Flask y se registra el Blueprint.
 
+import os
+
 from flask import Flask
 
 from controllers.polizas_controller import bp
@@ -12,6 +14,10 @@ app = Flask(
     static_folder="public/static",
     static_url_path="/static",
 )
+
+# CLAVE: Flask la necesita para los mensajes flash.
+# En Render se puede cambiar con la variable de entorno SECRET_KEY.
+app.secret_key = os.environ.get("SECRET_KEY", "control-polizas-clave-local")
 
 # REGISTRO: conectamos las rutas del controlador con la app.
 app.register_blueprint(bp)

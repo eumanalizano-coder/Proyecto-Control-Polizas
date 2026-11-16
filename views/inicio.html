@@ -28,12 +28,37 @@
         {% endif %}
     </section>
 
-    {# BOTÓN: descarga de todos los avisos en un .zip #}
-    <div class="acciones">
-        <a class="boton" href="{{ url_for('polizas.descargar_avisos') }}">
-            Descargar todos los avisos (.zip)
+    {# MENSAJES: resultado de importar el Excel o ejecutar el proceso #}
+    {% with mensajes = get_flashed_messages(with_categories=true) %}
+        {% if mensajes %}
+        <div class="mensajes">
+            {% for categoria, texto in mensajes %}
+            <p class="mensaje mensaje-{{ categoria }}">{{ texto }}</p>
+            {% endfor %}
+        </div>
+        {% endif %}
+    {% endwith %}
+
+    {# ACCIONES: importar Excel, ejecutar proceso y exportar avisos #}
+    <section class="acciones">
+        <form class="accion accion-archivo"
+              action="{{ url_for('polizas.importar_excel') }}"
+              method="post"
+              enctype="multipart/form-data">
+            <input class="archivo" type="file" name="archivo" accept=".xlsx" required>
+            <button class="boton boton-secundario" type="submit">Importar Excel</button>
+        </form>
+
+        <form class="accion" action="{{ url_for('polizas.ejecutar_proceso') }}" method="post">
+            <button class="boton" type="submit">Ejecutar proceso</button>
+        </form>
+
+        <a class="boton boton-secundario" href="{{ url_for('polizas.descargar_avisos') }}">
+            Exportar avisos (.zip)
         </a>
-    </div>
+    </section>
+
+    <p class="nota origen">Excel en uso: <strong>{{ origen_excel }}</strong></p>
 
     {# DOS PANELES: primas por aseguradora e inconsistencias #}
     <section class="columnas">

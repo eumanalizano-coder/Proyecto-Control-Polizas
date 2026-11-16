@@ -11,5 +11,8 @@ __pycache__/
 # PDF de prueba generado en local.
 prueba_laura.pdf
 
+# Excel que importa el usuario desde la app (se recrea al importar).
+uploads/
+
 # Variables de entorno y secretos.
 .env

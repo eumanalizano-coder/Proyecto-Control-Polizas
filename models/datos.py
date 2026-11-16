@@ -2,6 +2,7 @@
 # CAPA DE DATOS: este es el único archivo que abre archivos.
 # Aquí convertimos el Excel y los PDF en datos que Python puede usar.
 
+import shutil
 from datetime import date, datetime
 from pathlib import Path
 
@@ -14,6 +15,11 @@ RAIZ = Path(__file__).resolve().parent.parent
 CARPETA_DATOS = RAIZ / "data"
 RUTA_CLIENTES = CARPETA_DATOS / "Maestro_Clientes.xlsx"
 CARPETA_POLIZAS = CARPETA_DATOS / "polizas"
+
+# CARPETA DE SUBIDAS: aquí se guarda el Excel que importa el usuario.
+# Nunca tocamos data/: los archivos originales quedan intactos.
+CARPETA_SUBIDAS = RAIZ / "uploads"
+RUTA_CLIENTES_SUBIDOS = CARPETA_SUBIDAS / "Maestro_Clientes.xlsx"
 
 # DICCIONARIO CAMPOS: etiqueta que aparece en el PDF -> nombre del campo en Python.
 CAMPOS = {
@@ -59,12 +65,22 @@ def _a_numero(valor: str | None) -> float | None:
         return None
 
 
+def ruta_clientes() -> Path:
+    """Devuelve el Excel que debe usarse: primero el importado, luego el de data/."""
+    # CONDICIONAL: si el usuario ya importó un Excel, ese manda.
+    if RUTA_CLIENTES_SUBIDOS.exists():
+        return RUTA_CLIENTES_SUBIDOS
+
+    # Si no, usamos el archivo original de data/.
+    return RUTA_CLIENTES
+
+
 def cargar_clientes() -> pd.DataFrame:
-    """Lee data/Maestro_Clientes.xlsx, hoja 'Clientes', y devuelve un DataFrame."""
+    """Lee el Excel de clientes (hoja 'Clientes') y devuelve un DataFrame."""
     # VARIABLE: DataFrame con los clientes.
     # dtype={'Cedula': str} obliga a leer la cédula como texto, no como número.
     clientes = pd.read_excel(
-        RUTA_CLIENTES,
+        ruta_clientes(),
         sheet_name="Clientes",
         dtype={"Cedula": str},
     )
@@ -80,6 +96,47 @@ def cargar_clientes() -> pd.DataFrame:
     )
 
     return clientes
+
+
+def guardar_clientes(archivo) -> int:
+    """Valida el Excel subido, lo guarda en uploads/ y devuelve cuántos clientes tiene.
+
+    Si el archivo no sirve, lanza ValueError con un mensaje claro.
+    """
+    # VARIABLE: nombre del archivo que envió el navegador.
+    nombre = getattr(archivo, "filename", "") or ""
+
+    # CONDICIONAL: solo aceptamos archivos .xlsx.
+    if not nombre.lower().endswith(".xlsx"):
+        raise ValueError("El archivo debe ser un Excel con extensión .xlsx.")
+
+    # BLOQUE try/except: intentamos leer la hoja "Clientes" para validar.
+    try:
+        archivo.seek(0)
+        datos = pd.read_excel(archivo, sheet_name="Clientes", dtype={"Cedula": str})
+    except Exception as error:
+        raise ValueError(
+            "No se pudo leer el Excel. Revisa que tenga una hoja llamada 'Clientes'."
+        ) from error
+
+    # CONDICIONAL: el Excel debe traer la columna Cedula.
+    if "Cedula" not in datos.columns:
+        raise ValueError("El Excel no tiene la columna 'Cedula'.")
+
+    # CONDICIONAL: no aceptamos un Excel vacío.
+    if len(datos) == 0:
+        raise ValueError("El Excel no tiene clientes.")
+
+    # CARPETA: la creamos si todavía no existe.
+    CARPETA_SUBIDAS.mkdir(parents=True, exist_ok=True)
+
+    # GUARDAR: copiamos el archivo subido a uploads/.
+    archivo.seek(0)
+    with open(RUTA_CLIENTES_SUBIDOS, "wb") as salida:
+        shutil.copyfileobj(archivo, salida)
+
+    # Devolvemos cuántos clientes trajo.
+    return len(datos)
 
 
 def leer_poliza(ruta_pdf: str | Path) -> dict:

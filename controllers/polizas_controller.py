@@ -6,8 +6,18 @@
 from io import BytesIO
 from zipfile import ZIP_DEFLATED, ZipFile
 
-from flask import Blueprint, abort, render_template, send_file
+from flask import (
+    Blueprint,
+    abort,
+    flash,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    url_for,
+)
 
+from models.datos import guardar_clientes, ruta_clientes
 from models.polizas import (
     FECHA_CORTE,
     buscar_inconsistencias,
@@ -31,6 +41,10 @@ def inicio():
     # VARIABLE: lista de pólizas ya cruzadas con el maestro.
     resultados = calcular_resultados()
 
+    # VARIABLE: de dónde sale el Excel en uso (uploads/ o data/).
+    ruta_excel = ruta_clientes()
+    origen_excel = f"{ruta_excel.parent.name}/{ruta_excel.name}"
+
     # RENDER: la vista solo muestra; los datos vienen ya calculados.
     return render_template(
         "inicio.html",
@@ -39,7 +53,41 @@ def inicio():
         primas=primas_por_aseguradora(resultados),
         inconsistencias=buscar_inconsistencias(resultados),
         fecha_corte=FECHA_CORTE,
+        origen_excel=origen_excel,
     )
+
+
+@bp.route("/importar-excel", methods=["POST"])
+def importar_excel():
+    """Recibe el Excel del formulario, lo guarda y vuelve al tablero."""
+    # VARIABLE: archivo que llegó en el formulario (puede venir vacío).
+    archivo = request.files.get("archivo")
+
+    # CONDICIONAL: si no eligieron archivo, avisamos y volvemos.
+    if archivo is None or not archivo.filename:
+        flash("Selecciona un archivo Excel antes de importar.", "error")
+        return redirect(url_for("polizas.inicio"))
+
+    # BLOQUE try/except: guardar_clientes valida y guarda el archivo.
+    try:
+        total = guardar_clientes(archivo)
+    except ValueError as error:
+        flash(str(error), "error")
+    else:
+        flash(f"Excel importado correctamente: {total} clientes.", "ok")
+
+    return redirect(url_for("polizas.inicio"))
+
+
+@bp.route("/ejecutar-proceso", methods=["POST"])
+def ejecutar_proceso():
+    """Vuelve a calcular todo y refresca el tablero con un mensaje."""
+    # VARIABLE: recalculamos para confirmar que los datos se leyeron bien.
+    resultados = calcular_resultados()
+
+    flash(f"Proceso ejecutado: {len(resultados)} pólizas revisadas.", "ok")
+
+    return redirect(url_for("polizas.inicio"))
 
 
 @bp.route("/aviso/<numero>")
